@@ -1,0 +1,554 @@
+install.packages("OpenMx","psych")
+
+require(OpenMx)   #Loads OpenMx
+require(psych)   #Loads Psych package
+library(devtools)
+library(umx)
+library (OpenMx)
+library (haven)
+library (dplyr)
+library(car)
+library(psych)
+library(lme4)
+library(nlme)
+library(lmerTest)
+library(ggplot2)
+library(tidyverse)
+library(lme4)
+library(car)
+library(multilevelTools)
+source("GenEpiHelperFunctions.R")
+source("polychoricMeansMatrix3.R")
+library(haven)
+#install.packages("JWileyMisc")
+library(JWileymisc)
+library(effects)
+#install.packages("sjPlot")
+library(sjPlot)
+#install.packages("sjmisc")
+library(sjmisc)
+library(sjPlot)
+library(sjmisc)
+library(ggplot2)
+library(reghelper)
+quartz()
+library(Rcmdr)
+library(emmeans)
+library(interactions)
+library(ReporteRs)
+library(expss)
+library(dplyr)
+library(tidyr)
+install.packages("tvem")
+library(tvem)
+
+#READ IN DATA;
+setwd("~/Downloads")
+
+ACTIVE <- read_sav("SM_DRIVING_PAPER_Long_27July2022-2.sav")
+names(ACTIVE)
+names(ACTIVE)<- toupper(names(ACTIVE))
+
+
+#editing data;
+#VETSA <- within(VETSA, {
+#  CP_CRP_V3 <- Recode(CP_CRP_V3_R, "9 = 4", as.factor=TRUE, to.value="=", interval=":", separator=";")
+#})
+
+model3 <- tvem(data=ACTIVE.sub,
+               formula=TOTLS ~ MFQCOMP,
+               id=ID,
+               time=AGE_LONG)
+model3
+plot(model3)
+#Set variables to factors
+
+ACTIVE$RACE_CAT <- to_factor(ACTIVE.sub$RACE_CAT) # conversion
+
+#Add labels
+
+ACTIVE<-apply_labels(ACTIVE.sub, DRIVDIF5_L_ADJ = "Driving Difficulty 5-Item",
+                     ZDRIVDIF3_L_ADJ = "DRIVING DIFFICULTY",
+                     ZES_SDOH_COMP = "ES",
+                     ZSCC_SDOH_COMP = "SCC",
+                     ZNBE_SDOH_COMP = "NBE",
+                     ZDS_COR_B = "Baseline DSST Processing Speed",
+                     ZDS_COR_WP = "Change in Processing Speed",
+                     ZDRIVEXPO_L_ADJ = "Driving Exposure",
+                     DRIVDIF3_L_ADJ = "Driving Dificulty - Typical",
+                     ZTOTDS_L_ADJ="Driving Space",
+                     ZSOPCOMP_B = "Baseline UFOV Processing Speed",
+                     ZSOPCOMP_WP = "Decline in UFOV Processing Speed",
+                     ZDS_COR_WP = "Decline in DSST Processing Speed")
+
+#DATA SELECTION; WE SELECTED THE CONTROL GROUP OF ACTIVE;  
+ACTIVE.sub <- subset(ACTIVE, ACTIVE$INTGRPR==4)  #want only controls
+ACTIVE.sub <- subset(ACTIVE.sub, ACTIVE.sub$RACE_CAT<3) #want only White or Black identifying participants
+ACTIVE.sub <- subset(ACTIVE.sub, ACTIVE.sub$CURDRIV_L==1) #want only current drivers
+
+ACTIVE.sub <- subset(ACTIVE, ACTIVE$INTGRPR==4)  #want only controls
+ACTIVE.sub_b <- subset(ACTIVE.sub, ACTIVE.sub$RACE_CAT) #want only White or Black identifying participants
+
+ACTIVE$NEARLS
+model3 <- tvem(data=ACTIVE.sub,
+               formula=TOTLS ~ ZES_SDOH_COMP,
+               id=ID,
+               invar_effect =~ SITE,
+               time=AGE_LONG)
+model3
+plot(model3)
+
+model3 <- tvem(data=ACTIVE.sub,
+               formula ~ TOTLS,
+               id=ID,
+               time=AGE_LONG)
+model3
+plot(model3)
+#Recode Variables
+mutate(ifelse(ACTIVE.sub$INDEX1 == 1,ACTIVE.sub$ZDRIVDIF5_L,ACTIVE.sub$ZDRIVDIF5_B))
+
+#Make sure within-person measures go into decline direction for figures;
+ACTIVE.sub$ZDS_COR_WPR = ACTIVE.sub$ZDS_COR_WP*-1;
+#Descriptives by race (Table 1)
+
+numSummary(ACTIVE.sub[,c("MEMCOMP_B","SOPCOMP_B","REASCOMP_B","TOTDS_B","DRIVDIF3_B", "DRIVDIF5_B","DRIVEXPO_B"), drop=FALSE],
+           statistics=c("mean", "sd",  "IQR", "quantiles"), quantiles=c(0,.25,.5,.75,1),groups=ACTIVE.sub$RACE_CAT)
+
+#Code to test all interactions;
+selvar=c("TOTLS_WP", "MFQCOMP_B", "MFQCOMP_WP",
+         "AGEB","AGE_LONG_TIMESINCE", "ZSF36PF_L", "GENDER_CAT", "RACE_CAT",
+         "ZNBE_SDOH_COMP", "ZES_SDOH_COMP","ZEOS_SDOH_COMP", "CESDTOT")
+
+ACTIVE.sub2<-- ACTIVE.sub[selvar]
+
+Model.result <- lm(TOTLS_WP ~ .^2, data= ACTIVE.sub2)
+summary(Model.result)
+
+#Mixed model code;
+model.result <- lmer(Y ~   X  + (1| ID ), ACTIVE.sub, REML=FALSE)
+summary(model.result)
+
+#Plotting interactions
+newdata <- subset(ACTIVE.sub, is.na(DRIVDIF5_L)==0)
+
+#Plot continuous by categorical interaction
+
+Plot.HandPick<-ggplot(data=newdata, aes(x=REASCOMP_WP, y=DRIVDIF5_L, group=RACE_CAT))+
+  stat_smooth(size=2, aes(linetype =RACE_CAT),method="lm")+
+  ylab("Driving Space")+
+  xlab("Change in Reasoning") + theme(text=element_text(family="serif", size=12))
+Plot.HandPick$labels$colour <- "Race"
+Plot.HandPick
+
+#Identify significant regions
+#sig_regions(figure.1)
+
+#Plot continuous by categorical interaction
+
+figure.2.mlm <-lmer(TOTDS_L_ADJ ~   AGEB + ZES_SDOH_COMP +
+                      GENDER_CAT + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP
+                    + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                      ZSOPCOMP_B + ZSOPCOMP_WP + ZES_SDOH_COMP*ZSOPCOMP_B+
+                      ZES_SDOH_COMP*ZSOPCOMP_WP + (1| ID ), ACTIVE.sub, REML=FALSE)
+summary(figure.2.mlm)
+
+figure.2.results <-lm(ZTOTDS_L_ADJ ~   AGEB + ZES_SDOH_COMP +
+                        GENDER_CAT + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP
+                      + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                        ZSOPCOMP_B + ZSOPCOMP_WP + ZES_SDOH_COMP*ZSOPCOMP_B+
+                        ZES_SDOH_COMP*ZSOPCOMP_WP, data = ACTIVE.sub)
+summary (figure.2.results)
+
+plot_model(figure.2.results, type = "pred", terms = c("ZSOPCOMP_WP", "ZES_SDOH_COMP"))
+interact_plot(figure.2.results, pred=ZSOPCOMP_WP, modx=ZES_SDOH_COMP,
+              interval = T, int.type = c("confidence"), int.width = 0.95,)
+
+simpleslope.2<-figure.2.results
+effa <- mean(ACTIVE.sub$ZES_SDOH_COMP) + sd(ACTIVE.sub$ZES_SDOH_COMP)
+eff <- mean(ACTIVE.sub$ZES_SDOH_COMP)
+effb <- mean(ACTIVE.sub$ZES_SDOH_COMP) - sd(ACTIVE.sub$ZES_SDOH_COMP)
+effar <- round(effa,3)
+effr <- round(eff,3)
+effbr <- round(effb,3)
+
+mylist <- list(ZES_SDOH_COMP=c(-1,0,1))
+emtrends(simpleslope.2, ~ZES_SDOH_COMP, var="ZSOPCOMP_WP",at=mylist)
+
+figure.3.mlm <-lmer(DRIVEXPO_L_ADJ~   AGEB + ZSCC_SDOH_COMP + GENDER_CAT
+                    + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                      ZDS_COR_B + ZDS_COR_WPR + ZDS_COR_B*ZSCC_SDOH_COMP
+                    + ZSCC_SDOH_COMP*ZDS_COR_WPR + (1| ID ), ACTIVE.sub, REML=FALSE)
+summary(figure.3.mlm)
+figure.3 <-lm(DRIVEXPO_L_ADJ~   AGEB + ZSCC_SDOH_COMP + GENDER_CAT
+              + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                ZDS_COR_B + ZDS_COR_WPR + ZDS_COR_B*ZSCC_SDOH_COMP+ ZSCC_SDOH_COMP*ZDS_COR_WPR, data= ACTIVE.sub)
+summary(figure.3)
+interact_plot(figure.3, pred=ZDS_COR_WPR, modx=ZSCC_SDOH_COMP,
+              interval = T, int.type = c("confidence"), int.width = 0.95,)
+#Simple slope comparisons
+simpleslope.3<-figure.3
+effa <- mean(ACTIVE.sub$ZSCC_SDOH_COMP) + sd(ACTIVE.sub$ZSCC_SDOH_COMP)
+eff <- mean(ACTIVE.sub$ZSCC_SDOH_COMP)
+effb <- mean(ACTIVE.sub$ZSCC_SDOH_COMP) - sd(ACTIVE.sub$ZSCC_SDOH_COMP)
+effar <- round(effa,3)
+effr <- round(eff,3)
+effbr <- round(effb,3)
+
+mylist <- list(ZSCC_SDOH_COMP=c(-1,0,1))
+emtrends(simpleslope.3, ~ZSCC_SDOH_COMP, var="ZDS_COR_WP",at=mylist)
+
+figure.4.mlm <-lmer(ZDRIVEXPO_L_ADJ~   AGEB + ZNBE_SDOH_COMP + GENDER_CAT
+                    + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                      ZDS_COR_B + ZDS_COR_WPR + ZDS_COR_B*ZNBE_SDOH_COMP
+                    + ZNBE_SDOH_COMP*ZDS_COR_WPR + (1| ID ), ACTIVE.sub, REML=FALSE)
+summary(figure.4.mlm)
+figure.4 <-lm(ZDRIVDIF3_L_ADJ~   AGEB + ZNBE_SDOH_COMP + GENDER_CAT
+              + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                ZDS_COR_B + ZDS_COR_WPR + ZDS_COR_B*ZNBE_SDOH_COMP+ ZNBE_SDOH_COMP*ZDS_COR_WPR, data= ACTIVE.sub)
+summary(figure.4)
+interact_plot(figure.4, pred=ZDS_COR_B, modx=ZNBE_SDOH_COMP,
+              
+              interval = T, int.type = c("confidence"), int.width = 0.95,)
+#Simple slope comparisons
+simpleslope.4<-figure.4
+effa <- mean(ACTIVE.sub$ZNBE_SDOH_COMP) + sd(ACTIVE.sub$ZNBE_SDOH_COMP)
+eff <- mean(ACTIVE.sub$ZNBE_SDOH_COMP)
+effb <- mean(ACTIVE.sub$ZNBE_SDOH_COMP) - sd(ACTIVE.sub$ZNBE_SDOH_COMP)
+effar <- round(effa,3)
+effr <- round(eff,3)
+effbr <- round(effb,3)
+
+mylist <- list(ZNBE_SDOH_COMP=c(-1,0,1))
+emtrends(simpleslope.4, ~ZNBE_SDOH_COMP, var="ZDS_COR_B",at=mylist)
+
+figure.5.mlm <-lmer(ZDRIVDIF3_L_ADJ~   AGEB + ZNBE_SDOH_COMP + GENDER_CAT
+                    + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                      ZDS_COR_B + ZDS_COR_WPR + ZDS_COR_B*ZNBE_SDOH_COMP
+                    + ZNBE_SDOH_COMP*ZDS_COR_WPR + (1| ID ), ACTIVE.sub, REML=FALSE)
+summary(figure.5.mlm)
+figure.5 <-lm(ZDRIVDIF3_L_ADJ~   AGEB + ZNBE_SDOH_COMP + GENDER_CAT
+              + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                ZDS_COR_B + ZDS_COR_WPR + ZDS_COR_B*ZNBE_SDOH_COMP+
+                ZNBE_SDOH_COMP*ZDS_COR_WPR, data= ACTIVE.sub)
+summary(figure.5)
+interact_plot(figure.5, pred=ZDS_COR_WPR, modx=ZNBE_SDOH_COMP,
+              interval = T, int.type = c("confidence"), int.width = 0.95,)
+#Simple slope comparisons
+simpleslope.5<-figure.5
+effa <- mean(ACTIVE.sub$ZNBE_SDOH_COMP) + sd(ACTIVE.sub$ZNBE_SDOH_COMP)
+eff <- mean(ACTIVE.sub$ZNBE_SDOH_COMP)
+effb <- mean(ACTIVE.sub$ZNBE_SDOH_COMP) - sd(ACTIVE.sub$ZNBE_SDOH_COMP)
+effar <- round(effa,3)
+effr <- round(eff,3)
+effbr <- round(effb,3)
+
+mylist <- list(ZNBE_SDOH_COMP=c(-1,0,1))
+emtrends(simpleslope.5, ~ZNBE_SDOH_COMP, var="ZDS_COR_WP",at=mylist)
+
+
+figure.6.mlm <-lmer(DRIVDIF5_L_ADJ~   AGEB + ZSCC_SDOH_COMP + GENDER_CAT
+                    + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                      ZDS_COR_B + ZDS_COR_WP + ZDS_COR_B*ZSCC_SDOH_COMP
+                    + ZSCC_SDOH_COMP*ZDS_COR_WP + (1| ID ), ACTIVE.sub, REML=FALSE)
+summary(figure.6.mlm)
+figure.6 <-lm(DRIVDIF5_L_ADJ~   AGEB + ZSCC_SDOH_COMP + GENDER_CAT
+              + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                ZDS_COR_B + ZDS_COR_WP + ZDS_COR_B*ZSCC_SDOH_COMP+ ZSCC_SDOH_COMP*ZDS_COR_WP, data= ACTIVE.sub)
+summary(figure.6)
+interact_plot(figure.6, pred=ZDS_COR_B, modx=ZSCC_SDOH_COMP,
+              interval = T, int.type = c("confidence"), int.width = 0.95,)
+#Simple slope comparisons
+simpleslope.6<-figure.6
+effa <- mean(ACTIVE.sub$ZSCC_SDOH_COMP) + sd(ACTIVE.sub$ZSCC_SDOH_COMP)
+eff <- mean(ACTIVE.sub$ZSCC_SDOH_COMP)
+effb <- mean(ACTIVE.sub$ZSCC_SDOH_COMP) - sd(ACTIVE.sub$ZSCC_SDOH_COMP)
+effar <- round(effa,3)
+effr <- round(eff,3)
+effbr <- round(effb,3)
+
+mylist <- list(ZSCC_SDOH_COMP=c(-1,0,1))
+emtrends(simpleslope.7, ~ZSCC_SDOH_COMP, var="ZDS_COR_B",at=mylist)
+
+
+
+figure.7.mlm <-lmer(DRIVDIF5_L_ADJ~   AGEB + ZSCC_SDOH_COMP + GENDER_CAT
+                    + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                      ZDS_COR_B + ZDS_COR_WP + ZDS_COR_B*ZSCC_SDOH_COMP
+                    + ZSCC_SDOH_COMP*ZDS_COR_WP + (1| ID ), ACTIVE.sub, REML=FALSE)
+summary(figure.7.mlm)
+figure.7 <-lm(ZDRIVDIF5_L_ADJ~   AGEB + ZSCC_SDOH_COMP + GENDER_CAT
+              + ZDAYSDRIV_L + ZHEALTH_G_L + ZFUNCCOMP + ZSF36PF_L + AGE_LONG_TIMESINCE +
+                ZDS_COR_B + ZDS_COR_WPR + ZDS_COR_B*ZSCC_SDOH_COMP+ ZSCC_SDOH_COMP*ZDS_COR_WPR, data= ACTIVE.sub)
+summary(figure.7)
+
+interact_plot(figure.7, pred=ZDS_COR_WPR, modx=ZSCC_SDOH_COMP,
+              interval = T, int.type = c("confidence"), int.width = 0.95,)
+?interact_plot
+#Simple slope comparisons
+simpleslope.7<-figure.7
+effa <- mean(ACTIVE.sub$ZSCC_SDOH_COMP) + sd(ACTIVE.sub$ZSCC_SDOH_COMP)
+eff <- mean(ACTIVE.sub$ZSCC_SDOH_COMP)
+effb <- mean(ACTIVE.sub$ZSCC_SDOH_COMP) - sd(ACTIVE.sub$ZSCC_SDOH_COMP)
+effar <- round(effa,3)
+effr <- round(eff,3)
+effbr <- round(effb,3)
+
+mylist <- list(ZSCC_SDOH_COMP=c(-1,0,1))
+emtrends(simpleslope.7, ~ZSCC_SDOH_COMP, var="ZDS_COR_B",at=mylist)
+
+ACTIVE.sub$MFQCOMP_BR <- ACTIVE.sub$MFQCOMP_B*-1
+ACTIVE.sub$MFQCOMP_WPR <- ACTIVE.sub$MFQCOMP_WP*-1
+figure.7 <-lm(TOTLS~   AGEB + MFQCOMP_B + MFQCOMP_WP
+              + ZEOS_SDOH_COMP + GENDER_CAT
+              + ZDAYSDRIV_L +  AGE_LONG_TIMESINCE
+              + MFQCOMP_B*MFQCOMP_WP, data= ACTIVE.sub)
+summary(figure.7)
+
+interact_plot(figure.7, pred=MFQCOMP_BR, modx=ZEOS_SDOH_COMP,
+              interval = T, int.type = c("confidence"), int.width = 0.95,)
+?interact_plot
+#Simple slope comparisons
+simpleslope.7<-figure.7
+effa <- mean(ACTIVE.sub$ZEOS_SDOH_COMP) + sd(ACTIVE.sub$ZEOS_SDOH_COMP)
+eff <- mean(ACTIVE.sub$ZEOS_SDOH_COMP)
+effb <- mean(ACTIVE.sub$ZEOS_SDOH_COMP) - sd(ACTIVE.sub$ZEOS_SDOH_COMP)
+effar <- round(effa,3)
+effr <- round(eff,3)
+effbr <- round(effb,3)
+
+mylist <- list(ZEOS_SDOH_COMP=c(-1,0,1))
+emtrends(simpleslope.7, ~ZEOS_SDOH_COMP, var="MFQCOMP_BR",at=mylist)
+
+time=AGE_LONG)
+print(model3)
+plot(model3)
+#DATA DESCRIPTION;
+#COGNITIVE VARIABLES ARE STANDARDIZED AND FOLLOW-UP SCORES ARE ADJUSTED FOR BASELINE SCORES SO THAT FOLLOW-UP SCORES REPRESENT DECLINE
+#GENDER: MEN =1 AND WOMEN =2
+#MARSTATE:  MARRIED/PARTNERED = 1 SINGLE/DIVORCED/WIDOWED = 0;
+#EDUCLEVL
+#CESD - 20 ITEM CENTER OF EPIDEMIOLOGICAL STUDIES - DEPRESSION SCALE
+#BP = SF36 BODILY PAIN SCORE (ITEM 21) GREATER THAN 3 = 1, LESS THAN 4 = 0 (>3 = CLINICAL LEVELS OF PAIN); _B MEANS BASELINE; _NEW = INCIDENT PAIN AFTER BASELINE; 
+#PBP = PERSISTENT BODILY PAIN DEFINED AS CLINICALLY SIGNIFICANT PAIN OCCURING AT TWO TIMEPOINTS CONSECUTIVELY (1 = YES; 0 = NO)
+
+#DATA SELECTION; WE SELECTED THE CONTROL GROUP OF ACTIVE;  
+sex.sub <- subset(sex, sex$INTGRPR==4)
+sex.sub <- subset(sex.sub, sex.sub$VALID_SUM>1)
+
+model.HVLTT <- lmer(MFQCOMP ~   AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B 
+                    + AGE_LONG_TIMESINCE + CESDTOT + TOTLS_B + TOTLS_WP
+                    + RACE_CAT*TOTLS_B +  RACE_CAT*TOTLS_B*AGE_LONG_TIMESINCE + (1| ID:SITE), sex.sub, REML=FALSE) 
+summary(model.HVLTT)
+
+model.HVLTT <- lmer(TOTLS ~   AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  ZCESD_B 
+                    + AGE_LONG_TIMESINCE + CESDTOT + ZMFQCOMP_B + ZMFQCOMP_WP + 
+                      RACE_CAT*ZMFQCOMP_B + (1| ID:SITE), sex.sub, REML=FALSE) 
+summary(model.HVLTT)
+#MLM MODELS;
+#OTHER RANDOM EFFECTS (GENDER_CAT | ID) + (MARSTAT_CAT | ID) + (RACE_CAT | ID) + (EDUCLEVL | ID) + (CESD_B | ID) ;
+#sex.sub$PBP <- to_factor(sex.sub$PBP) # conversion
+#sex.sub$BP_NEW <- to_factor(sex.sub$BP_NEW) # conversion
+#sex.sub$AGE_LONGC <- to_numeric(sex.sub$AGE_LONGC)
+
+
+
+model.HVLTT <- lmer(ZWS_COR ~   AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_B + 
+                      + AGE_LONGC_TIMESINCE + BP_NEW4 +  BP_SUM + CESDTOT + 
+                      + RACE_CAT*AGE_LONGC_TIMESINCE + GENDER_CAT*AGE_LONGC_TIMESINCE + EDUCLEVL*AGE_LONGC_TIMESINCE + CESD_B*AGE_LONGC_TIMESINCE 
+                    + BP_B*AGE_LONGC_TIMESINCE + MARSTAT_CAT*AGE_LONGC_TIMESINCE +
+                      CESDTOT*AGE_LONGC_TIMESINCE + BP_NEW4*AGE_LONGC_TIMESINCE + BP_SUM*AGE_LONGC_TIMESINCE  
+                    + VALID_SUM + (1| ID ), sex.sub, REML=FALSE) 
+summary(model.HVLTT)
+
+HVLTT.mt<-modelTest(model.HVLTT); HVLTT.mt
+
+
+model.AVLTT <- lmer(ZIMMRAW ~  AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_B + 
+                      + AGE_LONGC_TIMESINCE + BP_NEW4 +  BP_SUM + CESDTOT + 
+                      + RACE_CAT*AGE_LONGC_TIMESINCE + GENDER_CAT*AGE_LONGC_TIMESINCE + EDUCLEVL*AGE_LONGC_TIMESINCE + CESD_B*AGE_LONGC_TIMESINCE 
+                    + BP_B*AGE_LONGC_TIMESINCE + MARSTAT_CAT*AGE_LONGC_TIMESINCE +
+                      CESDTOT*AGE_LONGC_TIMESINCE + BP_NEW4*AGE_LONGC_TIMESINCE + BP_SUM*AGE_LONGC_TIMESINCE + 
+                      (1| AGE_LONGC_TIMESINCE) + (1| ID), sex.sub, REML=FALSE) 
+summary(model.AVLTT)
+
+AVLTT.mt<-modelTest(model.AVLTT); AVLTT.mt
+
+
+model.IMMRAW <- lmer(ZIMMRAW ~  AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_B + 
+                       + AGE_LONGC_TIMESINCE + BP_NEW +  BP_SUM + CESDTOT + 
+                       + RACE_CAT*AGE_LONGC_TIMESINCE + GENDER_CAT*AGE_LONGC_TIMESINCE + EDUCLEVL*AGE_LONGC_TIMESINCE + CESD_B*AGE_LONGC_TIMESINCE 
+                     + BP_B*AGE_LONGC_TIMESINCE + MARSTAT_CAT*AGE_LONGC_TIMESINCE +
+                       CESDTOT*AGE_LONGC_TIMESINCE + BP_NEW*AGE_LONGC_TIMESINCE + BP_SUM*AGE_LONGC_TIMESINCE + 
+                       + (1| ID), sex.sub, REML=FALSE)  
+summary(model.IMMRAW)
+
+IMMRAW.mt<-modelTest(model.IMMRAW); IMMRAW.mt
+
+
+model.DSCOR <- lmer(UFOV2R ~   AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_B + 
+                      + AGE_LONGC_TIMESINCE + BP_NEW2 +  BP_SUM + CESDTOT + 
+                      + RACE_CAT*AGE_LONGC_TIMESINCE + GENDER_CAT*AGE_LONGC_TIMESINCE + EDUCLEVL*AGE_LONGC_TIMESINCE + CESD_B*AGE_LONGC_TIMESINCE 
+                    + BP_B*AGE_LONGC_TIMESINCE + MARSTAT_CAT*AGE_LONGC_TIMESINCE +
+                      CESDTOT*AGE_LONGC_TIMESINCE + BP_NEW2*AGE_LONGC_TIMESINCE + BP_SUM*AGE_LONGC_TIMESINCE + 
+                      + (1| ID), sex.sub, REML=FALSE)  
+summary(model.DSCOR)
+
+DSCOR.mt<-modelTest(model.DSCOR); DSCOR.mt
+
+model.DCCOR <- lmer(ZMMSE ~  AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_B + 
+                      + AGE_LONGC_LAST + BP_NEW2 +  BP_SUM + CESDTOT + 
+                      + RACE_CAT*AGE_LONGC_LAST + GENDER_CAT*AGE_LONGC_LAST + EDUCLEVL*AGE_LONGC_LAST + CESD_B*AGE_LONGC_LAST 
+                    + BP_B*AGE_LONGC_LAST + MARSTAT_CAT*AGE_LONGC_LAST +
+                      CESDTOT*AGE_LONGC_LAST + BP_NEW2*AGE_LONGC_LAST + BP_SUM*AGE_LONGC_LAST + 
+                      + (1| ID), sex.sub, REML=FALSE)   
+summary(model.DCCOR)
+
+DCCOR.mt<-modelTest(model.DCCOR); DCCOR.mt
+
+
+
+model.WSCOR <- lmer(ZWS_COR ~   AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_B + 
+                      + AGE_LONGC_TIMESINCE + BP_NEW2 +  BP_SUM + CESDTOT + UFOV2 + 
+                      + RACE_CAT*AGE_LONGC_TIMESINCE + GENDER_CAT*AGE_LONGC_TIMESINCE + EDUCLEVL*AGE_LONGC_TIMESINCE + CESD_B*AGE_LONGC_TIMESINCE 
+                    + BP_B*AGE_LONGC_TIMESINCE + MARSTAT_CAT*AGE_LONGC_TIMESINCE +
+                      CESDTOT*AGE_LONGC_TIMESINCE + BP_NEW2*AGE_LONGC_TIMESINCE + BP_SUM*AGE_LONGC_TIMESINCE + 
+                      + (1| ID), sex.sub, REML=FALSE)   
+summary(model.WSCOR)
+
+WSCOR.mt<-modelTest(model.WSCOR); WSCOR.mt
+
+
+
+model.LSCOR <- lmer(ZLS_COR ~ AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_B + 
+                      + AGE_LONGC_TIMESINCE + BP_NEW2 +  BP_SUM + CESDTOT + 
+                      + RACE_CAT*AGE_LONGC_TIMESINCE + GENDER_CAT*AGE_LONGC_TIMESINCE + EDUCLEVL*AGE_LONGC_TIMESINCE + CESD_B*AGE_LONGC_TIMESINCE 
+                    + BP_B*AGE_LONGC_TIMESINCE + MARSTAT_CAT*AGE_LONGC_TIMESINCE +
+                      CESDTOT*AGE_LONGC_TIMESINCE + BP_NEW2*AGE_LONGC_TIMESINCE + BP_SUM*AGE_LONGC_TIMESINCE + 
+                      + (1| ID), sex.sub, REML=FALSE)
+summary(model.LSCOR)
+
+LSCOR.mt<-modelTest(model.LSCOR); LSCOR.mt
+
+
+model.CRT <- lmer(ZCRT ~ AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_B + 
+                    + AGE_LONGC_TIMESINCE + BP_NEW +  BP_SUM + CESDTOT + 
+                    + RACE_CAT*AGE_LONGC_TIMESINCE + GENDER_CAT*AGE_LONGC_TIMESINCE + EDUCLEVL*AGE_LONGC_TIMESINCE + CESD_B*AGE_LONGC_TIMESINCE 
+                  + BP_B*AGE_LONGC_TIMESINCE + 
+                    CESDTOT*AGE_LONGC_TIMESINCE + BP_NEW*AGE_LONGC_TIMESINCE + BP_SUM*AGE_LONGC_TIMESINCE + 
+                    + (1| ID), sex.sub, REML=FALSE) 
+summary(model.CRT)
+
+CRT.mt<-modelTest(model.CRT); CRT.mt
+
+model.UFOV2 <- lmer(ZUFOV2 ~   AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_B + 
+                      + AGE_LONGC_TIMESINCE + BP_NEW3 +  BP_SUM + CESDTOT + 
+                      + RACE_CAT*AGE_LONGC_TIMESINCE + GENDER_CAT*AGE_LONGC_TIMESINCE + EDUCLEVL*AGE_LONGC_TIMESINCE + CESD_B*AGE_LONGC_TIMESINCE 
+                    + BP_B*AGE_LONGC_TIMESINCE + MARSTAT_CAT*AGE_LONGC_TIMESINCE +
+                      CESDTOT*AGE_LONGC_TIMESINCE + BP_NEW3*AGE_LONGC_TIMESINCE + BP_SUM*AGE_LONGC_TIMESINCE + 
+                      + (1| ID), sex.sub, REML=FALSE)   
+summary(model.UFOV2)
+
+
+
+model.UFOV2 <- lmer(ZUFOV2 ~  AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_NEWB + 
+                      + AGE_LONGC_TIMESINCE + BP_NEW2 +  BP_SUM + CESDTOT + 
+                      + RACE_CAT*AGE_LONGC_TIMESINCE + GENDER_CAT*AGE_LONGC_TIMESINCE + EDUCLEVL*AGE_LONGC_TIMESINCE + CESD_B*AGE_LONGC_TIMESINCE 
+                    + BP_NEWB*AGE_LONGC_TIMESINCE + MARSTAT_CAT*AGE_LONGC_TIMESINCE +
+                      CESDTOT*AGE_LONGC_TIMESINCE + BP_NEW2*AGE_LONGC_TIMESINCE + BP_SUM*AGE_LONGC_TIMESINCE + 
+                      + (1| ID), sex.sub, REML=FALSE) 
+summary(model.UFOV2)
+
+UFOV2.mt<-modelTest(model.UFOV2); UFOV2.mt
+
+model.UFOV3 <- lmer(ZUFOV3 ~ AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_B + 
+                      + AGE_LONGC_TIMESINCE + BP_NEW2 +  BP_SUM + CESDTOT + 
+                      + RACE_CAT*AGE_LONGC_TIMESINCE + GENDER_CAT*AGE_LONGC_TIMESINCE + EDUCLEVL*AGE_LONGC_TIMESINCE + CESD_B*AGE_LONGC_TIMESINCE 
+                    + BP_B*AGE_LONGC_TIMESINCE + MARSTAT_CAT*AGE_LONGC_TIMESINCE +
+                      CESDTOT*AGE_LONGC_TIMESINCE + BP_NEW2*AGE_LONGC_TIMESINCE + BP_SUM*AGE_LONGC_TIMESINCE + 
+                      + (1| ID), sex.sub, REML=FALSE) 
+summary(model.UFOV3)
+
+UFOV3.mt<-modelTest(model.UFOV3); UFOV3.mt
+
+model.UFOV4 <- lmer(ZUFOV4 ~   AGEB + RACE_CAT + GENDER_CAT + EDUCLEVL + MARSTAT_CAT +  CESD_B + BP_B + 
+                      + AGE_LONGC_TIMESINCE + BP_NEW2 +  BP_SUM + CESDTOT + 
+                      + RACE_CAT*AGE_LONGC_TIMESINCE + GENDER_CAT*AGE_LONGC_TIMESINCE + EDUCLEVL*AGE_LONGC_TIMESINCE + CESD_B*AGE_LONGC_TIMESINCE 
+                    + BP_B*AGE_LONGC_TIMESINCE + MARSTAT_CAT*AGE_LONGC_TIMESINCE +
+                      CESDTOT*AGE_LONGC_TIMESINCE + BP_NEW2*AGE_LONGC_TIMESINCE + BP_SUM*AGE_LONGC_TIMESINCE + 
+                      + (1| ID), sex.sub, REML=FALSE)
+summary(model.UFOV4)
+
+UFOV4.mt<-modelTest(model.UFOV4); UFOV4.mt
+
+
+newdata <- subset(sex.sub, is.na(BP_B)==0)
+newdata$BP_NEW2 <- to_factor(newdata$BP_NEW2) # conversion
+
+newdata$BP_B <- to_factor(newdata$BP_B) # conversion
+#linetype =; 
+library(ggplot2)                
+Plot.HandPick<-ggplot(data=newdata, aes(x=AGE_LONGC_TIMESINCE, y=DS_COR, group=BP_B))+
+  stat_smooth(size=2, aes(color=BP_B, linetype =BP_B ),method="lm")+
+  ylab("DSST")+
+  xlab("Years After Baseline") + xlim(0,10) + theme(text=element_text(family="serif", size=12)) 
+Plot.HandPick$labels$colour <- "Baseline Pain"
+Plot.HandPick
+
+library(ggplot2)                
+Plot.HandPick<-ggplot(data=newdata, aes(x=AGE_LONGC_TIMESINCE, y=MMSE, group=BP_B))+
+  stat_smooth(size=2, aes(color=BP_B, linetype =BP_B ),method="lm")+
+  ylab("MMSE")+
+  xlab("Years After Baseline") + xlim(0,10) + ylim(11,30) +  theme(text=element_text(family="serif", size=12)) 
+Plot.HandPick$labels$colour <- "Baseline Pain"
+Plot.HandPick
+
+newdata <- subset(sex.sub, is.na(BP_NEW2)==0)
+newdata$BP_NEW2 <- to_factor(newdata$BP_NEW2) # conversion
+
+
+library(ggplot2)                
+Plot.HandPick<-ggplot(data=newdata, aes(x=AGE_LONGC_TIMESINCE, y=CRTR, group=BP_NEW2))+
+  stat_smooth(size=2, aes(color=BP_NEW2,linetype =BP_NEW2),method="lm")+
+  ylab("CRT")+
+  xlab("Years After Baseline")  + xlim(0,10) + theme(text=element_text(family="serif", size=12)) 
+Plot.HandPick$labels$colour <- "Incident Pain"
+Plot.HandPick
+
+library(ggplot2)                
+Plot.HandPick<-ggplot(data=newdata, aes(x=AGE_LONGC_TIMESINCE, y=CRT, group=BP_NEW2))+
+  stat_smooth(size=2, aes(color=BP_NEW2,linetype =BP_NEW2),method="lm")+
+  ylab("CRT")+
+  xlab("Years After Baseline")  + xlim(0,10) + ylim(0,5) + theme(text=element_text(family="serif", size=12)) 
+Plot.HandPick$labels$colour <- "Incident Pain"
+Plot.HandPick
+
+library(ggplot2)                
+Plot.HandPick<-ggplot(data=newdata, aes(x=AGE_LONGC_TIMESINCE, y=WS_COR, group=BP_NEW2))+
+  stat_smooth(size=2, aes(color=BP_NEW2,linetype =BP_NEW2),method="lm")+
+  ylab("Word Series")+
+  xlab("Years After Baseline")  + xlim(0,10) + ylim(0,17.5) + theme(text=element_text(family="serif", size=12)) 
+Plot.HandPick$labels$colour <- "Incident Pain"
+Plot.HandPick
+
+library(ggplot2)                
+Plot.HandPick<-ggplot(data=newdata, aes(x=AGE_LONGC_TIMESINCE, y=LS_COR, group=BP_NEW2))+
+  stat_smooth(size=2, aes(color=BP_NEW2,linetype =BP_NEW2),method="lm")+
+  ylab("Letter Series")+
+  xlab("Years After Baseline")  + xlim(0,10) + ylim(0,17.5) + theme(text=element_text(family="serif", size=12)) 
+Plot.HandPick$labels$colour <- "Incident Pain"
+Plot.HandPick
+library(ggplot2)                
+Plot.HandPick<-ggplot(data=newdata, aes(x=AGE_LONGC_TIMESINCE, y=IMMRAW, group=BP_NEW2))+
+  stat_smooth(size=2, aes(color=BP_NEW2,linetype =BP_NEW2),method="lm")+
+  ylab("PRT")+
+  xlab("Years After Baseline")  + xlim(0,10) + ylim(0,10) + theme(text=element_text(family="serif", size=12)) 
+Plot.HandPick$labels$colour <- "Incident Pain"
+Plot.HandPick
+
+library(ggplot2)                
+Plot.HandPick<-ggplot(data=newdata, aes(x=AGE_LONGC_TIMESINCE, y=MMSE, group=BP_NEW2))+
+  stat_smooth(size=2, aes(color=BP_NEW2,linetype =BP_NEW2),method="lm")+
+  ylab("MMSE")+
+  xlab("Years After Baseline")  + xlim(0,10) + ylim(11,30) + theme(text=element_text(family="serif", size=12)) 
+Plot.HandPick$labels$colour <- "Incident Pain"
+Plot.HandPick
