@@ -1,0 +1,151 @@
+library(devtools)
+library(umx)
+library (OpenMx)
+library (haven)
+library (dplyr)
+library(car)
+library(psych)
+library(lme4)
+library(nlme)
+library(lmerTest)
+library(ggplot2)
+library(tidyverse)
+library(lme4)
+library(car)
+library(multilevelTools)
+library(haven)
+library(JWileymisc)
+library(effects)
+library(sjPlot)
+library(sjmisc)
+library(splines)
+library(officer)
+library(rvg)
+source("C:/Users/trbell/Documents/OpenMx Workshop 2023/GenEpiHelperFunctions.R")
+source("C:/Users/trbell/Documents/OpenMx Workshop 2023/polychoricMeansMatrix3.R")
+
+#SET WORKING DIRECTORY; 
+
+setwd("C:/Users/trbell/Documents/ACTIVE/Katie")
+
+#READ IN DATA; 
+ACTIVE<-NA
+ACTIVE <- read_sav("Driving Mobility 10yr_extended.sav",encoding="latin1")
+names(ACTIVE)
+names(ACTIVE)<- toupper(names(ACTIVE))
+
+model <- lmer(DDEXP_L ~ 1 + INTGRPR + AGE + VISTOTAL + GENDER_CAT + WHITE + 
+                HEALTH_G + MONTHS + DDEXP_B + INTGRPR*MONTHS + INTGRPR*DDEXP_B*MONTHS +
+                (1 | ID), 
+              data = ACTIVE, REML = TRUE)
+
+summary(model)
+
+
+ACTIVE$INTGRPR<-as_factor(ACTIVE$INTGRPR)
+
+fig1<-ggplot(ACTIVE, aes(x = MONTHS, y = scale(DDEXP_L), color = as.factor(INTGRPR), linetype = INTGRPR)) +
+  geom_smooth(method = "auto", se = TRUE, fullrange = TRUE, size = 1.5) +
+  labs(x = "Months",
+       y = "Exposure to Difficult Driving (z-score)",
+       color = "Intervention",
+       linetype = "Intervention") + 
+  theme_minimal() +  
+  theme(text = element_text(size = 16)) 
+
+fig2<-ggplot(ACTIVE, aes(x = MONTHS, y = scale(DRIVDIF3_L), color = as.factor(INTGRPR), linetype = INTGRPR)) +
+  geom_smooth(method = "auto", se = TRUE, fullrange = TRUE, size = 1.5) +
+  labs(x = "Months",
+       y = "Difficulty Driving Typical Risk (z-score)",
+       color = "Intervention",
+       linetype = "Intervention") + 
+  theme_minimal() +  
+  theme(text = element_text(size = 16)) 
+
+fig3<-ggplot(ACTIVE, aes(x = MONTHS, y = scale(DRIVDIF5_L), color = as.factor(INTGRPR), linetype = INTGRPR)) +
+  geom_smooth(method = "auto", se = TRUE, fullrange = TRUE, size = 1.5) +
+  labs(x = "Months",
+       y = "Difficulty Driving High Risk (z-score)",
+       color = "Intervention",
+       linetype = "Intervention") + 
+  theme_minimal() +  
+  theme(text = element_text(size = 16)) 
+
+
+fig4<-ggplot(ACTIVE, aes(x = MONTHS, y = scale(TOTDS_L), color = as.factor(INTGRPR), linetype = INTGRPR)) +
+  geom_smooth(method = "gam", se = TRUE, fullrange = TRUE, size = 1.5) +
+  labs(x = "Months",
+       y = "Driving Space (z-score)",
+       color = "Intervention",
+       linetype = "Intervention") + 
+  theme_minimal() +  
+  theme(text = element_text(size = 16)) 
+
+#output figures; 
+
+pptx <- read_pptx()
+
+pptx %>%
+  add_slide() %>%
+  # This first line puts it in as a static png image for comparison
+  ph_with(fig1, location = ph_location_type(type = "body")) %>%
+  add_slide() %>%
+  # This line puts in a shape object, which can be ungrouped and edited
+  ph_with(rvg::dml(ggobj = fig1),
+          width = 8,
+          height = 4,
+          location = ph_location_type(type = "body"))
+
+#> pptx document with 2 slide(s)
+
+print(pptx, "fig1.pptx")
+
+pptx <- read_pptx()
+
+pptx %>%
+  add_slide() %>%
+  # This first line puts it in as a static png image for comparison
+  ph_with(fig2, location = ph_location_type(type = "body")) %>%
+  add_slide() %>%
+  # This line puts in a shape object, which can be ungrouped and edited
+  ph_with(rvg::dml(ggobj = fig2),
+          width = 8,
+          height = 4,
+          location = ph_location_type(type = "body"))
+
+#> pptx document with 2 slide(s)
+
+print(pptx, "fig2.pptx")
+
+pptx <- read_pptx()
+pptx %>%
+  add_slide() %>%
+  # This first line puts it in as a static png image for comparison
+  ph_with(fig3, location = ph_location_type(type = "body")) %>%
+  add_slide() %>%
+  # This line puts in a shape object, which can be ungrouped and edited
+  ph_with(rvg::dml(ggobj = fig3),
+          width = 8,
+          height = 4,
+          location = ph_location_type(type = "body"))
+
+#> pptx document with 2 slide(s)
+
+print(pptx, "fig3.pptx")
+
+
+pptx <- read_pptx()
+pptx %>%
+  add_slide() %>%
+  # This first line puts it in as a static png image for comparison
+  ph_with(fig4, location = ph_location_type(type = "body")) %>%
+  add_slide() %>%
+  # This line puts in a shape object, which can be ungrouped and edited
+  ph_with(rvg::dml(ggobj = fig4),
+          width = 8,
+          height = 4,
+          location = ph_location_type(type = "body"))
+
+#> pptx document with 2 slide(s)
+
+print(pptx, "fig4.pptx")
