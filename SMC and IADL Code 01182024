@@ -1,0 +1,210 @@
+library(devtools)
+library(umx)
+library (OpenMx)
+library (haven)
+library (dplyr)
+library(car)
+library(psych)
+library(lme4)
+library(nlme)
+library(lmerTest)
+library(ggplot2)
+library(tidyverse)
+library(lme4)
+library(car)
+library(multilevelTools)
+library(haven)
+library(JWileymisc)
+library(effects)
+library(sjPlot)
+library(sjmisc)
+library(splines)
+library(officer)
+library(rvg)
+source("C*/Users/trbell/Documents/OpenMx Workshop 2023/GenEpiHelperFunctions.R")
+source("C*/Users/trbell/Documents/OpenMx Workshop 2023/polychoricMeansMatrix3.R")
+
+#SET WORKING DIRECTORY; 
+
+setwd("C*/Users/trbell/Documents/ACTIVE/ACTIVE/ACTIVE/ACTIVE/Data/Original/")
+
+#READ IN DATA; 
+ACTIVE<-NA
+ACTIVE <- read_sav("SM_DRIVING_PAPER_Long_27July2022.sav",encoding="latin1")
+names(ACTIVE)
+names(ACTIVE)<- toupper(names(ACTIVE))
+ACTIVE.sub<-NA
+ACTIVE.sub <- subset(ACTIVE, MCI_B == 0)
+ACTIVE.sub$MFQ_FF_L
+
+ACTIVE.sub$AGE_SQRT<-ACTIVE.sub$AGE_LONG_TIMESINCE*ACTIVE.sub$AGE_LONG_TIMESINCE;
+#NBE_SDOH_COMP;
+
+model_NBE_TIADL <- lmer(TIADL_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
+                          MFQ_FF_L*NBE_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
+                          (1 | ID), data = ACTIVE.sub)
+
+
+summary(model_NBE_TIADL)
+
+
+model_NBE_ADLT <- lmer(ADLT_LONG ~  ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
+                         MFQ_FF_L*NBE_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
+                         (1 | ID), data = ACTIVE.sub)
+
+
+summary(model_NBE_ADLT)
+
+
+#EOS_SDOH_COMP;
+
+
+model_EOS_TIADL <- lmer(TIADL_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
+                          MFQ_FF_L*EOS_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
+                          (1 | ID), data = ACTIVE.sub)
+
+summary(model_EOS_TIADL)
+
+
+model_EOS_ADLT <- lmer(ADLT_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
+                         MFQ_FF_L*EOS_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
+                         (1 | ID), data = ACTIVE.sub)
+
+
+summary(model_EOS_ADLT)
+
+#ES_SDOH_COMP;
+model_ES_TIADL <- lmer(TIADL_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
+                         MFQ_FF_L*ES_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
+                         (1 | ID), data = ACTIVE.sub)
+
+
+summary(model_ES_TIADL)
+
+
+model_ES_ADLT <- lmer(ADLT_LONG ~  ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
+                        MFQ_FF_L*ES_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
+                        (1 | ID), data = ACTIVE.sub)
+summary(model_ES_ADLT)
+
+#SCC_SDOH_COMP;
+
+model_SCC_TIADL <- lmer(TIADL_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
+                          MFQ_FF_L*SCC_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
+                          (1 | ID), data = ACTIVE.sub)
+summary(model_SCC_TIADL)
+
+
+model_SCC_ADLT <- lmer(ADLT_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
+                         MFQ_FF_L*SCC_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
+                         (1 | ID), data = ACTIVE.sub)
+summary(model_SCC_ADLT)
+
+tab_model(model_SCC_ADLT, p.val = "kr", show.df = TRUE)
+ACTIVE$INTGRPR<-as_factor(ACTIVE$INTGRPR)
+
+fig1<-ggplot(ACTIVE, aes(x = MONTHS, y = scale(DDEXP_L), color = as.factor(INTGRPR), linetype = INTGRPR)) +
+  geom_smooth(method = "auto", se = TRUE, fullrange = TRUE, size = 1.5) +
+  labs(x = "Months",
+       y = "Exposure to Difficult Driving (z-score)",
+       color = "Intervention",
+       linetype = "Intervention") + 
+  theme_minimal() +  
+  theme(text = element_text(size = 16)) 
+
+fig2<-ggplot(ACTIVE, aes(x = MONTHS, y = scale(DRIVDIF3_L), color = as.factor(INTGRPR), linetype = INTGRPR)) +
+  geom_smooth(method = "auto", se = TRUE, fullrange = TRUE, size = 1.5) +
+  labs(x = "Months",
+       y = "Difficulty Driving Typical Risk (z-score)",
+       color = "Intervention",
+       linetype = "Intervention") + 
+  theme_minimal() +  
+  theme(text = element_text(size = 16)) 
+
+fig3<-ggplot(ACTIVE, aes(x = MONTHS, y = scale(DRIVDIF5_L), color = as.factor(INTGRPR), linetype = INTGRPR)) +
+  geom_smooth(method = "auto", se = TRUE, fullrange = TRUE, size = 1.5) +
+  labs(x = "Months",
+       y = "Difficulty Driving High Risk (z-score)",
+       color = "Intervention",
+       linetype = "Intervention") + 
+  theme_minimal() +  
+  theme(text = element_text(size = 16)) 
+
+
+fig4<-ggplot(ACTIVE, aes(x = MONTHS, y = scale(TOTDS_L), color = as.factor(INTGRPR), linetype = INTGRPR)) +
+  geom_smooth(method = "gam", se = TRUE, fullrange = TRUE, size = 1.5) +
+  labs(x = "Months",
+       y = "Driving Space (z-score)",
+       color = "Intervention",
+       linetype = "Intervention") + 
+  theme_minimal() +  
+  theme(text = element_text(size = 16)) 
+
+#output figures; 
+
+pptx <- read_pptx()
+
+pptx %>%
+  add_slide() %>%
+  # This first line puts it in as a static png image for comparison
+  ph_with(fig1, location = ph_location_type(type = "body")) %>%
+  add_slide() %>%
+  # This line puts in a shape object, which can be ungrouped and edited
+  ph_with(rvg**dml(ggobj = fig1),
+          width = 8,
+          height = 4,
+          location = ph_location_type(type = "body"))
+
+#> pptx document with 2 slide(s)
+
+print(pptx, "fig1.pptx")
+
+pptx <- read_pptx()
+
+pptx %>%
+  add_slide() %>%
+  # This first line puts it in as a static png image for comparison
+  ph_with(fig2, location = ph_location_type(type = "body")) %>%
+  add_slide() %>%
+  # This line puts in a shape object, which can be ungrouped and edited
+  ph_with(rvg**dml(ggobj = fig2),
+          width = 8,
+          height = 4,
+          location = ph_location_type(type = "body"))
+
+#> pptx document with 2 slide(s)
+
+print(pptx, "fig2.pptx")
+
+pptx <- read_pptx()
+pptx %>%
+  add_slide() %>%
+  # This first line puts it in as a static png image for comparison
+  ph_with(fig3, location = ph_location_type(type = "body")) %>%
+  add_slide() %>%
+  # This line puts in a shape object, which can be ungrouped and edited
+  ph_with(rvg**dml(ggobj = fig3),
+          width = 8,
+          height = 4,
+          location = ph_location_type(type = "body"))
+
+#> pptx document with 2 slide(s)
+
+print(pptx, "fig3.pptx")
+
+
+pptx <- read_pptx()
+pptx %>%
+  add_slide() %>%
+  # This first line puts it in as a static png image for comparison
+  ph_with(fig4, location = ph_location_type(type = "body")) %>%
+  add_slide() %>%
+  # This line puts in a shape object, which can be ungrouped and edited
+  ph_with(rvg**dml(ggobj = fig4),
+          width = 8,
+          height = 4,
+          location = ph_location_type(type = "body"))
+
+#> pptx document with 2 slide(s)
+
+print(pptx, "fig4.pptx")
