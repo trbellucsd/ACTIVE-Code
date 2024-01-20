@@ -21,6 +21,9 @@ library(sjmisc)
 library(splines)
 library(officer)
 library(rvg)
+
+library(officer)
+library(rvg)
 source("C*/Users/trbell/Documents/OpenMx Workshop 2023/GenEpiHelperFunctions.R")
 source("C*/Users/trbell/Documents/OpenMx Workshop 2023/polychoricMeansMatrix3.R")
 
@@ -35,83 +38,124 @@ names(ACTIVE)
 names(ACTIVE)<- toupper(names(ACTIVE))
 ACTIVE.sub<-NA
 ACTIVE.sub <- subset(ACTIVE, MCI_B == 0)
-ACTIVE.sub$MFQ_FF_L
+
+ACTIVE.sub.control <- subset(ACTIVE.sub, MCI_B == 0 & INTGRPR ==4)
+ACTIVE.sub$MFQ_FF
+
+
+# Assuming 'MFQ_FF' is the variable for which you want to create quantile groups
+
+# Calculate quantiles
+quantiles <- quantile(ACTIVE.sub$MFQ_FF_B, probs = c(0, 0.5, 1), na.rm = TRUE)
+
+# Create MFQ_FF_QUANT variable
+ACTIVE.sub$MFQ_FF_B_QUANT <- cut(ACTIVE.sub$MFQ_FF_B, breaks = quantiles, labels = c("Q1", "Q2"), include.lowest = TRUE)
+
+ACTIVE.sub$MFQ_FF_L_QUANT <- cut(ACTIVE.sub$MFQ_FF_L, breaks = quantiles, labels = c("Q1", "Q2"), include.lowest = TRUE)
+
+quantiles3 <- quantile(ACTIVE.sub$ES_SDOH_COMP, probs = c(0, 0.5, 1), na.rm = TRUE)
+ACTIVE.sub$ES_QUANT <- cut(ACTIVE.sub$ES_SDOH_COMP, breaks = quantiles3, labels = c("Q1", "Q2"), include.lowest = TRUE)
+ACTIVE.sub$Combined_Groups <- interaction(ACTIVE.sub$MFQ_FF_B_QUANT, ACTIVE.sub$ES_QUANT)
+
+table(ACTIVE.sub$MFQ_FF_B_QUANT)
+table(ACTIVE.sub$Combined_Groups)
+# View the result
+head(ACTIVE.sub)
 
 ACTIVE.sub$AGE_SQRT<-ACTIVE.sub$AGE_LONG_TIMESINCE*ACTIVE.sub$AGE_LONG_TIMESINCE;
+ACTIVE.sub$YEARS<-ACTIVE.sub$AGE_LONG_TIMESINCE
 #NBE_SDOH_COMP;
 
-model_NBE_TIADL <- lmer(TIADL_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
-                          MFQ_FF_L*NBE_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
+model_NBE_TIADL_unadj <- lmer(TIADL_LONG ~ YEARS + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR +
+                          MFQ_FF_B*NBE_SDOH_COMP*YEARS + MFQ_FF_WP*NBE_SDOH_COMP*YEARS +
                           (1 | ID), data = ACTIVE.sub)
 
 
-summary(model_NBE_TIADL)
+summary(model_NBE_TIADL_unadj)
 
 
-model_NBE_ADLT <- lmer(ADLT_LONG ~  ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
-                         MFQ_FF_L*NBE_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
-                         (1 | ID), data = ACTIVE.sub)
+
+model_NBE_TIADL_adj <- lmer(TIADL_LONG ~ YEARS + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR +
+                                MFQ_FF_B*NBE_SDOH_COMP*YEARS + MFQ_FF_WP*NBE_SDOH_COMP*YEARS +
+                              + ZCESD_B*NBE_SDOH_COMP*YEARS + ZCESDTOT*NBE_SDOH_COMP*YEARS +
+                                (1 | ID), data = ACTIVE.sub)
 
 
-summary(model_NBE_ADLT)
+summary(model_NBE_TIADL_adj)
+
+
 
 
 #EOS_SDOH_COMP;
 
-
-model_EOS_TIADL <- lmer(TIADL_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
-                          MFQ_FF_L*EOS_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
-                          (1 | ID), data = ACTIVE.sub)
-
-summary(model_EOS_TIADL)
+model_EOS_TIADL_unadj <- lmer(TIADL_LONG ~ YEARS + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR +
+                                MFQ_FF_B*EOS_SDOH_COMP*YEARS + MFQ_FF_WP*EOS_SDOH_COMP*YEARS +
+                                (1 | ID), data = ACTIVE.sub)
 
 
-model_EOS_ADLT <- lmer(ADLT_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
-                         MFQ_FF_L*EOS_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
-                         (1 | ID), data = ACTIVE.sub)
+summary(model_EOS_TIADL_unadj)
 
 
-summary(model_EOS_ADLT)
+
+model_EOS_TIADL_adj <- lmer(TIADL_LONG ~ YEARS + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR +
+                              MFQ_FF_B*EOS_SDOH_COMP*YEARS + MFQ_FF_WP*EOS_SDOH_COMP*YEARS +
+                              + ZCESD_B*EOS_SDOH_COMP*YEARS + ZCESDTOT*EOS_SDOH_COMP*YEARS +
+                              (1 | ID), data = ACTIVE.sub)
+
+
+summary(model_EOS_TIADL_adj)
 
 #ES_SDOH_COMP;
-model_ES_TIADL <- lmer(TIADL_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
-                         MFQ_FF_L*ES_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
-                         (1 | ID), data = ACTIVE.sub)
+
+model_ES_TIADL_unadj <- lmer(TIADL_LONG ~ YEARS + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR +
+                                MFQ_FF_B*ES_SDOH_COMP*YEARS + MFQ_FF_WP*ES_SDOH_COMP*YEARS +
+                                (1 | ID), data = ACTIVE.sub)
 
 
-summary(model_ES_TIADL)
+summary(model_ES_TIADL_unadj)
 
 
-model_ES_ADLT <- lmer(ADLT_LONG ~  ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
-                        MFQ_FF_L*ES_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
-                        (1 | ID), data = ACTIVE.sub)
-summary(model_ES_ADLT)
+
+model_ES_TIADL_adj <- lmer(TIADL_LONG ~ YEARS + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR +
+                              MFQ_FF_B*ES_SDOH_COMP*YEARS + MFQ_FF_WP*ES_SDOH_COMP*YEARS +
+                              + ZCESD_B*ES_SDOH_COMP*YEARS + ZCESDTOT*ES_SDOH_COMP*YEARS +
+                              (1 | ID), data = ACTIVE.sub)
+
+
+summary(model_ES_TIADL_adj)
 
 #SCC_SDOH_COMP;
 
-model_SCC_TIADL <- lmer(TIADL_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
-                          MFQ_FF_L*SCC_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
-                          (1 | ID), data = ACTIVE.sub)
-summary(model_SCC_TIADL)
+
+model_SCC_TIADL_unadj <- lmer(TIADL_LONG ~ YEARS + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR +
+                               MFQ_FF_B*SCC_SDOH_COMP*YEARS + MFQ_FF_WP*SCC_SDOH_COMP*YEARS +
+                               (1 | ID), data = ACTIVE.sub)
 
 
-model_SCC_ADLT <- lmer(ADLT_LONG ~ ZAGE_LONG_TIMESINCE + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR + ZCESD_B + ZCESDTOT +
-                         MFQ_FF_L*SCC_SDOH_COMP*ZAGE_LONG_TIMESINCE + 
-                         (1 | ID), data = ACTIVE.sub)
-summary(model_SCC_ADLT)
+summary(model_SCC_TIADL_unadj)
 
+
+
+model_SCC_TIADL_adj <- lmer(TIADL_LONG ~ YEARS + RACE_CAT + GENDER_CAT + ZAGEB + INTGRPR +
+                             MFQ_FF_B*SCC_SDOH_COMP*YEARS + MFQ_FF_WP*SCC_SDOH_COMP*YEARS +
+                             + ZCESD_B*SCC_SDOH_COMP*YEARS + ZCESDTOT*SCC_SDOH_COMP*YEARS +
+                             (1 | ID), data = ACTIVE.sub)
+
+
+summary(model_SCC_TIADL_adj)
+tab_model(model_SCC_TIADL, p.val = "kr", show.df = TRUE)
 tab_model(model_SCC_ADLT, p.val = "kr", show.df = TRUE)
-ACTIVE$INTGRPR<-as_factor(ACTIVE$INTGRPR)
+ACTIVE$INTGRPR<-as_factor(ACTIVE$AGE_LONG_TIMESINCE)
 
-fig1<-ggplot(ACTIVE, aes(x = MONTHS, y = scale(DDEXP_L), color = as.factor(INTGRPR), linetype = INTGRPR)) +
-  geom_smooth(method = "auto", se = TRUE, fullrange = TRUE, size = 1.5) +
-  labs(x = "Months",
-       y = "Exposure to Difficult Driving (z-score)",
-       color = "Intervention",
-       linetype = "Intervention") + 
+ACTIVE.sub$ES_QUART
+fig1<-ggplot(ACTIVE.sub, aes(x = AGE_LONG_TIMESINCE, y = scale(TIADL_LONG), color = as.factor(Combined_Groups), linetype = as.factor(Combined_Groups))) +
+  geom_smooth(method = "lm", se = TRUE, fullrange = TRUE, size = 1.5) + 
+  labs(x = "Years",
+       y = "TIADL",
+       color = "ES_QUART",
+       linetype = "ES_QUART") + 
   theme_minimal() +  
-  theme(text = element_text(size = 16)) 
-
+  theme(text = element_text(size = 16))
 fig2<-ggplot(ACTIVE, aes(x = MONTHS, y = scale(DRIVDIF3_L), color = as.factor(INTGRPR), linetype = INTGRPR)) +
   geom_smooth(method = "auto", se = TRUE, fullrange = TRUE, size = 1.5) +
   labs(x = "Months",
@@ -142,6 +186,12 @@ fig4<-ggplot(ACTIVE, aes(x = MONTHS, y = scale(TOTDS_L), color = as.factor(INTGR
 
 #output figures; 
 
+library(officer)
+library(rvg)
+library(ggplot2)
+
+# Assuming 'fig1' is your ggplot object
+
 pptx <- read_pptx()
 
 pptx %>%
@@ -150,16 +200,16 @@ pptx %>%
   ph_with(fig1, location = ph_location_type(type = "body")) %>%
   add_slide() %>%
   # This line puts in a shape object, which can be ungrouped and edited
-  ph_with(rvg**dml(ggobj = fig1),
+  ph_with(rvg::dml(ggobj = fig1),
           width = 8,
           height = 4,
           location = ph_location_type(type = "body"))
 
-#> pptx document with 2 slide(s)
-
-print(pptx, "fig1.pptx")
+# Print the pptx document
+print(pptx, "fig1_SMC_IADL.pptx")
 
 pptx <- read_pptx()
+
 
 pptx %>%
   add_slide() %>%
