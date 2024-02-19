@@ -1,0 +1,178 @@
+library(devtools)
+library(umx)
+library (OpenMx)
+library (haven)
+library (dplyr)
+library(car)
+library(psych)
+library(lme4)
+library(nlme)
+library(lmerTest)
+library(ggplot2)
+library(tidyverse)
+library(lme4)
+library(car)
+library(multilevelTools)
+library(haven)
+library(JWileymisc)
+library(effects)
+library(sjPlot)
+library(sjmisc)
+source("C:/Users/trbell/Documents/OpenMx Workshop 2023/GenEpiHelperFunctions.R")
+source("C:/Users/trbell/Documents/OpenMx Workshop 2023/polychoricMeansMatrix3.R")
+
+#SET WORKING DIRECTORY; 
+
+setwd("C:/Users/trbell/Documents/")
+
+#READ IN DATA; 
+ACTIVE<-NA
+ACTIVE <- read_sav("SDOH and Race Data_1.sav",encoding="latin1")
+names(ACTIVE)
+names(ACTIVE)<- toupper(names(ACTIVE))
+
+#DATA SELECTION; WE SELECTED THE CONTROL GROUP OF ACTIVE;  
+
+ACTIVE.sub <- subset(ACTIVE, (ACTIVE$INTGRPR==3 | ACTIVE$INTGRPR==4))
+
+view(ACTIVE.mem.sub)
+# SOPCOMP_B High and Low Groups; 
+ACTIVE$SOPCOMP_B_QUART <- cut(ACTIVE$SOPCOMP_B, breaks = 2, labels = c("1", "2"), include.lowest = TRUE)
+table(ACTIVE$SOPCOMP_B_QUART)
+
+
+
+
+
+
+#FIGURE 1. 
+
+model_DS <- lmer(TOTDS_L ~ INTGRPR + GENDER_CAT + ES_SDOH_COMP + AGEB + SITE + VISTOTAL + HEALTH_G + MILEDRIV + YEARS + DDEXP_B + SOPCOMP_B + SOPCOMP_WP +
+                SOPCOMP_B*YEARS*ES_SDOH_COMP +  SOPCOMP_WP*YEARS*ES_SDOH_COMP +
+                (1 | ID), data = ACTIVE.sub, REML = TRUE)
+summary(model_DS)
+
+ACTIVE.sub$SOPCOMP_B_YEARS<-ACTIVE.sub$SOPCOMP_B*ACTIVE.sub$YEARS
+model_b <- lmer(DDEXP_L ~ INTGRPR + GENDER_CAT + ES_SDOH_COMP + AGEB + SITE + VISTOTAL + HEALTH_G + MILEDRIV + YEARS + DDEXP_B + SOPCOMP_B + SOPCOMP_WP +
+                SOPCOMP_B_YEARS*ES_SDOH_COMP +  SOPCOMP_WP*YEARS*ES_SDOH_COMP +
+                (1 | ID), data = ACTIVE.sub, REML = TRUE)
+summary(model_b)
+
+
+simpleslope.2<-model_b
+effa <- mean(ACTIVE.sub$ES_SDOH_COMP) + sd(ACTIVE.sub$ES_SDOH_COMP)
+eff <- mean(ACTIVE.sub$ES_SDOH_COMP)
+effb <- mean(ACTIVE.sub$ES_SDOH_COMP) - sd(ACTIVE.sub$ES_SDOH_COMP)
+effar <- round(effa,3)
+effr <- round(eff,3)
+effbr <- round(effb,3)
+
+mylist <- list(ES_SDOH_COMP=c(-1,0,1))
+emtrends(model, ~ES_SDOH_COMP, var="SOPCOMP_B_YEARS",at=mylist)
+
+
+labels <- c("1" = "ES - Q1", "2" = "ES - Q2", "3" = "ES - Q3", "4" = "ES - Q4")
+
+
+
+ACTIVE.sub.complete <- subset(ACTIVE.sub, complete.cases(DDEXP_L, SOPCOMP_B))
+
+
+model <- lmer(DDEXP_L ~ 
+                (1 | ID), data = ACTIVE.sub.complete, REML = TRUE)
+ACTIVE.sub.complete$DDEXP_L_ADJ <- resid(model)
+
+model <- lmer(DDEXP_L ~ 
+                (1 | ID), data = ACTIVE.sub.complete, REML = TRUE)
+ACTIVE.sub.complete$DDEXP_L_ADJ <- resid(model)
+
+TOTDS_ES <- ggplot(ACTIVE.sub.complete, aes(x = scale(SOPCOMP_B), y = scale(TOTDS_L), color = as.factor(ES_QUARTILE), linetype = as.factor(ES_QUARTILE))) +
+  geom_smooth(method = "lm", se = TRUE, fullrange = TRUE) +
+  labs(x = "Baseline SOP (higher is worse)",
+       y = "Baseline Driving Space",
+       color = "Group",
+       linetype = "Group") + 
+  theme_minimal() +
+  scale_color_manual(values = c("1" = "salmon", "2" = "chartreuse4", "3" = "mediumpurple4", "4" = "cyan3"), labels = labels) +
+  scale_linetype_manual(values = c("1" = "dashed", "2" = "solid", "3" = "dotted", "4" = "dotdash"),labels = labels)
+TOTDS_ES
+
+
+library(officer)
+library(rvg)
+pptx <- read_pptx()
+
+pptx %>%
+  add_slide() %>%
+  # This first line puts it in as a static png image for comparison
+  ph_with(TOTDS_ES, location = ph_location_type(type = "body")) %>%
+  add_slide() %>%
+  # This line puts in a shape object, which can be ungrouped and edited
+  ph_with(rvg::dml(ggobj = TOTDS_ES),
+          width = 8,
+          height = 4,
+          location = ph_location_type(type = "body"))
+
+#> pptx document with 2 slide(s)
+
+print(pptx, "TOTDS_ES.pptx")
+
+
+
+#Figure 2. 
+
+
+model_DDEXP <- lmer(DDEXP_L ~ INTGRPR + GENDER_CAT + ES_SDOH_COMP + AGEB + SITE + VISTOTAL + HEALTH_G + MILEDRIV + YEARS + DDEXP_B + SOPCOMP_B + SOPCOMP_WP +
+                   SOPCOMP_B*YEARS*NBE_SDOH_COMP +  SOPCOMP_WP*YEARS*NBE_SDOH_COMP +
+                   (1 | ID), data = ACTIVE.sub, REML = TRUE)
+summary(model_DDEXP)
+
+
+# Assuming your data frame is called "your_data"
+ACTIVE.sub$newvariable_NBE <- ifelse(ACTIVE.sub$SOPCOMP_B_QUART == 1 & ACTIVE.sub$NBE_QUARTILE == 1, 1,
+                                ifelse(ACTIVE.sub$SOPCOMP_B_QUART == 1 & ACTIVE.sub$NBE_QUARTILE == 2, 1,
+                                       ifelse(ACTIVE.sub$SOPCOMP_B_QUART == 1 & ACTIVE.sub$NBE_QUARTILE == 3, 3,
+                                              ifelse(ACTIVE.sub$SOPCOMP_B_QUART == 1 & ACTIVE.sub$NBE_QUARTILE == 4, 3,
+                                                     ifelse(ACTIVE.sub$SOPCOMP_B_QUART == 2 & ACTIVE.sub$NBE_QUARTILE == 1, 2,
+                                                            ifelse(ACTIVE.sub$SOPCOMP_B_QUART == 2 & ACTIVE.sub$NBE_QUARTILE == 2, 2,
+                                                                   ifelse(ACTIVE.sub$SOPCOMP_B_QUART == 2 & ACTIVE.sub$NBE_QUARTILE == 3, 4,
+                                                                          ifelse(ACTIVE.sub$SOPCOMP_B_QUART == 2 & ACTIVE.sub$NBE_QUARTILE == 4, 4, NA))))))))
+
+
+ACTIVE.sub.complete <- subset(ACTIVE.sub, complete.cases(DDEXP_L, SOPCOMP_B))
+
+model <- lmer(DDEXP_L ~ 
+                (1 | ID), data = ACTIVE.sub.complete, REML = TRUE)
+ACTIVE.sub.complete$DDEXP_L_ADJ <- resid(model)
+
+labels2 <- c("1" = "Low (Better) SOP - Low NBE", "2" = "Higher (Worse) SOP - Low NBE", "3" = "Low (Better) SOP - High NBE", "4" = "Higher (Worse) SOP - High NBE")
+
+DDEXP_ES <- ggplot(ACTIVE.sub.complete, aes(x = YEARS, y = scale(DDEXP_L_ADJ), color = as.factor(newvariable_NBE), linetype = as.factor(newvariable_NBE))) +
+  geom_smooth(method = "lm", se = TRUE, fullrange = TRUE) +
+  labs(x = "Years",
+       y = "Driving Exposure",
+       color = "Group",
+       linetype = "Group") + 
+  theme_minimal() +
+  scale_color_manual(values = c("1" = "salmon", "2" = "chartreuse4", "3" = "mediumpurple4", "4" = "cyan3"), labels = labels2) +
+  scale_linetype_manual(values = c("1" = "dashed", "2" = "solid", "3" = "dotted", "4" = "dotdash"),labels = labels2)
+DDEXP_ES
+
+
+pptx <- read_pptx()
+
+pptx %>%
+  add_slide() %>%
+  # This first line puts it in as a static png image for comparison
+  ph_with(DDEXP_ES, location = ph_location_type(type = "body")) %>%
+  add_slide() %>%
+  # This line puts in a shape object, which can be ungrouped and edited
+  ph_with(rvg::dml(ggobj = DDEXP_ES),
+          width = 8,
+          height = 4,
+          location = ph_location_type(type = "body"))
+
+#> pptx document with 2 slide(s)
+
+print(pptx, "DDEXP_ES.pptx")
+
